@@ -2,15 +2,13 @@ name: CI
 
 
 on:
-  pull_request:
+  push:
     branches: [main]
-    types: [closed]
 
 jobs:
   check:
     name: Lint y build
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
 
     steps:
       - name: Checkout
@@ -19,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
         
       - name: Install dependencias 
@@ -34,10 +32,3 @@ jobs:
 
       - name: Build
         run: npm run build
-      
-      - name: Subir artefacto dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 7
