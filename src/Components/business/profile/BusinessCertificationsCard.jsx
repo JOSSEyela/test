@@ -15,21 +15,23 @@ function CompactCertRow({ cert }) {
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${status.cls}`}>
           {status.label}
         </span>
-        <a
-          href={cert.verification_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Verificar certificación"
-          className="text-muted hover:text-primary-mid transition-colors"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        {cert.verification_url && (
+          <a
+            href={cert.verification_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Verificar certificación"
+            className="text-muted hover:text-primary-mid transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-export default function BusinessCertificationsCard({ certifications }) {
+export default function BusinessCertificationsCard({ certifications, canManage }) {
   const isEmpty = !certifications?.length;
 
   return (
@@ -42,12 +44,18 @@ export default function BusinessCertificationsCard({ certifications }) {
             <Award className="w-6 h-6 text-muted" />
           </div>
           <p className="text-sm text-muted">No hay certificaciones registradas aún.</p>
-          <Link
-            to="/dashboardBusiness/certificaciones"
-            className="text-sm font-medium text-primary-mid hover:text-primary-dark transition-colors"
-          >
-            Subir documentos
-          </Link>
+          {canManage ? (
+            <Link
+              to="/dashboardBusiness/certificaciones"
+              className="text-sm font-medium text-primary-mid hover:text-primary-dark transition-colors"
+            >
+              Subir documentos
+            </Link>
+          ) : (
+            <span className="text-sm font-medium text-muted opacity-40 cursor-not-allowed select-none">
+              Subir documentos
+            </span>
+          )}
         </div>
       ) : (
         <div>

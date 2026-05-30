@@ -6,9 +6,9 @@ import { saveToken } from '../utils/storage';
 const redirectByRole = (rol, navigate) => {
   switch (rol?.toLowerCase()) {
     case 'admin': return navigate('/adminDashboard', { replace: true });
-    case 'owner': return navigate('/dashboardBusiness', { replace: true });
+    case 'owner': return navigate('/dashboardBusiness/perfil', { replace: true });
     case 'user':
-    default:      return navigate('/dashboard', { replace: true });
+    default:      return navigate('/', { replace: true });
   }
 };
 
@@ -26,6 +26,19 @@ export default function GoogleCallback() {
 
     try {
       saveToken(token);
+
+      const raw = sessionStorage.getItem('google_register_intent');
+      if (raw) {
+        sessionStorage.removeItem('google_register_intent');
+        const { roleId } = JSON.parse(raw);
+        if (Number(roleId) === 3) {
+          navigate('/register/business', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+        return;
+      }
+
       const payload = decodeToken(token);
       redirectByRole(payload?.rol, navigate);
     } catch {
@@ -36,7 +49,7 @@ export default function GoogleCallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-app-bg">
       <div className="flex flex-col items-center gap-3">
-        <svg className="w-8 h-8 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none">
+        <svg className="w-8 h-8 animate-spin text-primary-mid" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
         </svg>

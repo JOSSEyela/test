@@ -1,21 +1,107 @@
-import { Award, LayoutDashboard, Loader2, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Award, ChevronLeft, ChevronRight, FileText, LayoutDashboard, Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BlockedPageGuard from '../../Components/business/BlockedPageGuard';
 import CertCard from '../../Components/business/CertCard';
-import ImageUploader from '../../Components/ui/ImageUploader';
+import ModalOverlay from '../../Components/ui/ModalOverlay';
 import { useToastContext } from '../../context/ToastContext';
-import { createCertification, deleteCertification, getMyCertifications } from '../../services/certifications/certifications.service';
-import { uploadGeneralImage } from '../../services/upload/upload.service';
+import useOwnerBusinessStatus from '../../hooks/useOwnerBusinessStatus';
+import { createCertification, deleteCertification, getMyCertifications, updateCertification } from '../../services/certifications/certifications.service';
+import { uploadDocument } from '../../services/upload/upload.service';
 
 const emptyForm = { name: '', issuing_entity: '', verification_url: '' };
 
+const PdfDropzone = forwardRef(function PdfDropzone({ onError, onFileStaged }, ref) {
+  const [file,     setFile]     = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef();
+
+  useImperativeHandle(ref, () => ({
+    get canUpload() { return !!file; },
+    async upload() {
+      if (!file) throw new Error('No hay archivo seleccionado');
+      const result = await uploadDocument(file);
+      return result.url;
+    },
+  }));
+
+  function validateAndStage(f) {
+    if (f.type !== 'application/pdf') {
+      onError?.('Solo se permiten archivos PDF.');
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      onError?.('El archivo no puede superar los 5 MB.');
+      return;
+    }
+    setFile(f);
+    onFileStaged?.(f);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) validateAndStage(f);
+  }
+
+  function handleChange(e) {
+    const f = e.target.files?.[0];
+    if (f) validateAndStage(f);
+    e.target.value = '';
+  }
+
+  const sizeText = file ? `${(file.size / 1024).toFixed(0)} KB` : null;
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+      onClick={() => !file && inputRef.current?.click()}
+      className={`relative flex flex-col items-center justify-center gap-3 h-28 rounded-xl border-2 border-dashed transition-colors ${
+        file ? 'border-primary-mid bg-primary-softest/40 cursor-default' :
+        dragging ? 'border-primary-mid bg-primary-softest/60 cursor-copy' :
+        'border-edge hover:border-primary-mid hover:bg-primary-softest/30 cursor-pointer'
+      }`}
+    >
+      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleChange} />
+      {file ? (
+        <div className="flex items-center gap-3 px-4 w-full">
+          <FileText className="w-8 h-8 text-primary-dark shrink-0" />
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm font-medium text-heading truncate">{file.name}</span>
+            <span className="text-xs text-muted">{sizeText}</span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFile(null); onFileStaged?.(null); }}
+            className="p-1 rounded-lg hover:bg-edge/40 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <Upload className="w-6 h-6 text-muted" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-body">Arrastra el PDF aquí</p>
+            <p className="text-xs text-muted mt-0.5">o haz clic para seleccionar · máx. 5 MB</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+});
+
 const inputCls = (err) =>
-  `w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition-colors focus:ring-2 focus:ring-green-400/30 ${
-    err ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-green-400'
+  `w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none transition-colors focus:ring-2 focus:ring-primary-mid/30 ${
+    err ? 'border-red-400 bg-red-50' : 'border-edge focus:border-primary-mid'
   }`;
 
-function CertFormModal({ onClose, onSave, loading }) {
-  const [form, setForm]     = useState(emptyForm);
+function CertFormModal({ onClose, onSave, loading, editingCert = null }) {
+  const isEdit = !!editingCert;
+  const [form, setForm]     = useState(isEdit ? { name: editingCert.name, issuing_entity: editingCert.issuing_entity, verification_url: editingCert.verification_url } : emptyForm);
   const [errors, setErrors] = useState({});
   const uploaderRef         = useRef();
   const { error: showError } = useToastContext();
@@ -29,14 +115,13 @@ function CertFormModal({ onClose, onSave, loading }) {
     const e = {};
     if (!form.name.trim()) e.name = 'El nombre es requerido.';
     if (!form.issuing_entity.trim()) e.issuing_entity = 'La entidad emisora es requerida.';
-    if (!form.verification_url.trim()) {
-      e.verification_url = 'La URL de verificación es requerida.';
-    } else {
+    if (form.verification_url.trim()) {
       try { new URL(form.verification_url.trim()); }
-      catch { e.verification_url = 'Ingresa una URL válida.'; }
+      catch { e.verification_url = 'Ingresa una URL válida (ej: https://...).'; }
     }
-    if (!uploaderRef.current?.canUpload) {
-      e.badge_url = 'La imagen del certificado es requerida.';
+    // En edición el PDF es opcional (puede reusar el existente)
+    if (!isEdit && !uploaderRef.current?.canUpload) {
+      e.badge_url = 'El documento PDF es requerido.';
     }
     return e;
   }
@@ -50,17 +135,19 @@ function CertFormModal({ onClose, onSave, loading }) {
       return;
     }
 
-    let badgeUrl;
-    try {
-      badgeUrl = await uploaderRef.current.upload();
-    } catch {
-      return;
+    let badgeUrl = editingCert?.badge_url ?? '';
+    if (uploaderRef.current?.canUpload) {
+      try {
+        badgeUrl = await uploaderRef.current.upload();
+      } catch {
+        return;
+      }
     }
 
     onSave({
       name:             form.name.trim(),
       issuing_entity:   form.issuing_entity.trim(),
-      verification_url: form.verification_url.trim(),
+      ...(form.verification_url.trim() ? { verification_url: form.verification_url.trim() } : {}),
       badge_url:        badgeUrl,
     });
   }
@@ -70,23 +157,22 @@ function CertFormModal({ onClose, onSave, loading }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800">Nueva certificación</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+    <ModalOverlay>
+      <div className="bg-card-bg rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-edge">
+          <h2 className="text-lg font-semibold text-heading">{isEdit ? 'Editar y reenviar certificación' : 'Nueva certificación'}</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-app-bg transition-colors">
+            <X className="w-5 h-5 text-muted" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Imagen del certificado <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-body mb-2">
+              Documento PDF <span className="text-red-500">*</span>
             </label>
-            <ImageUploader
+            <PdfDropzone
               ref={uploaderRef}
-              uploadFn={uploadGeneralImage}
               onError={showError}
               onFileStaged={handleFileStaged}
             />
@@ -96,7 +182,7 @@ function CertFormModal({ onClose, onSave, loading }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-body mb-1">
               Nombre <span className="text-red-500">*</span>
             </label>
             <input
@@ -110,7 +196,7 @@ function CertFormModal({ onClose, onSave, loading }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-body mb-1">
               Entidad emisora <span className="text-red-500">*</span>
             </label>
             <input
@@ -126,8 +212,8 @@ function CertFormModal({ onClose, onSave, loading }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              URL de verificación <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-body mb-1">
+              URL de verificación <span className="text-muted text-xs font-normal">(opcional)</span>
             </label>
             <input
               type="url"
@@ -145,45 +231,45 @@ function CertFormModal({ onClose, onSave, loading }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-edge text-sm font-medium text-body hover:bg-app-bg transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 py-2.5 rounded-xl bg-primary-dark hover:bg-primary-darkest disabled:opacity-50 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Enviando…' : 'Enviar certificación'}
+              {loading ? 'Enviando…' : isEdit ? 'Guardar y reenviar' : 'Enviar certificación'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
 function DeleteConfirmModal({ cert, onClose, onConfirm, loading }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <ModalOverlay>
+      <div className="bg-card-bg rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
             <Trash2 className="w-5 h-5 text-red-500" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-800">Eliminar certificación</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Esta acción no se puede deshacer.</p>
+            <h3 className="font-semibold text-heading">Eliminar certificación</h3>
+            <p className="text-sm text-muted mt-0.5">Esta acción no se puede deshacer.</p>
           </div>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-body">
           ¿Seguro que deseas eliminar <strong>"{cert.name}"</strong>?
         </p>
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-edge text-sm font-medium text-body hover:bg-app-bg transition-colors"
           >
             Cancelar
           </button>
@@ -197,7 +283,7 @@ function DeleteConfirmModal({ cert, onClose, onConfirm, loading }) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -215,7 +301,7 @@ function EmptyCertifications({ onAdd }) {
       </p>
       <button
         onClick={onAdd}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-dark hover:bg-primary-darkest text-white text-sm font-medium transition-colors"
       >
         <Plus className="w-4 h-4" />
         Agregar certificación
@@ -225,32 +311,53 @@ function EmptyCertifications({ onAdd }) {
 }
 
 export default function BusinessCertifications() {
+  const { isRejected, isPending, rejectionReason, status } = useOwnerBusinessStatus();
   const { success: showSuccess, error: showError } = useToastContext();
 
   const [certs, setCerts]                 = useState([]);
+  const [meta, setMeta]                   = useState({ totalItems: 0, totalPages: 1, currentPage: 1, totalPending: 0, totalApproved: 0 });
+  const [page, setPage]                   = useState(1);
   const [pageLoading, setPageLoading]     = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showForm, setShowForm]           = useState(false);
+  const [editingCert, setEditingCert]     = useState(null);
   const [deletingCert, setDeletingCert]   = useState(null);
 
-  async function loadCerts() {
-    const data = await getMyCertifications();
-    setCerts(Array.isArray(data) ? data : []);
-  }
+  const loadCerts = useCallback(async (p = 1) => {
+    try {
+      const data = await getMyCertifications({ page: p, limit: 9 });
+      setCerts(Array.isArray(data?.data) ? data.data : []);
+      if (data?.meta) setMeta(data.meta);
+    } catch {
+      showError('No se pudieron cargar las certificaciones.');
+    }
+  }, [showError]);
 
   useEffect(() => {
-    loadCerts()
-      .catch(() => showError('No se pudieron cargar las certificaciones.'))
-      .finally(() => setPageLoading(false));
-  }, []);
+    if (isRejected || isPending) { setPageLoading(false); return; }
+    loadCerts(1).finally(() => setPageLoading(false));
+  }, [isRejected, isPending, loadCerts]);
+
+  if (isRejected || isPending) return <BlockedPageGuard status={status} rejectionReason={rejectionReason} />;
+
+  const handlePageChange = (p) => {
+    setPage(p);
+    loadCerts(p);
+  };
 
   async function handleSave(formData) {
     setActionLoading(true);
     try {
-      await createCertification(formData);
-      showSuccess('Certificación enviada. Quedará pendiente de aprobación.');
-      await loadCerts();
-      setShowForm(false);
+      if (editingCert) {
+        await updateCertification(editingCert.id_certification, formData);
+        showSuccess('Certificación actualizada y enviada a revisión nuevamente.');
+        setEditingCert(null);
+      } else {
+        await createCertification(formData);
+        showSuccess('Certificación enviada. Quedará pendiente de aprobación.');
+        setShowForm(false);
+      }
+      await loadCerts(page);
     } catch (err) {
       showError(err?.message || 'No se pudo enviar la certificación.');
     } finally {
@@ -264,9 +371,9 @@ export default function BusinessCertifications() {
     try {
       await deleteCertification(deletingCert.id_certification);
       showSuccess('Certificación eliminada.');
-      setCerts((prev) =>
-        prev.filter((c) => c.id_certification !== deletingCert.id_certification),
-      );
+      const newPage = certs.length === 1 && page > 1 ? page - 1 : page;
+      setPage(newPage);
+      await loadCerts(newPage);
       setDeletingCert(null);
     } catch (err) {
       showError(err?.message || 'No se pudo eliminar la certificación.');
@@ -288,7 +395,7 @@ export default function BusinessCertifications() {
       <div className="space-y-3">
         <div className="flex items-center gap-1.5 text-xs text-muted">
           <LayoutDashboard className="w-3.5 h-3.5" />
-          <Link to="/dashboardBusiness" className="hover:text-body transition-colors">
+          <Link to="/dashboardBusiness/perfil" className="hover:text-body transition-colors">
             Mi Negocio
           </Link>
           <span>/</span>
@@ -301,16 +408,16 @@ export default function BusinessCertifications() {
               <Award className="w-5 h-5 text-primary-dark" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-heading">Certificaciones</h1>
+              <h1 className="text-3xl font-serif text-heading">Certificaciones</h1>
               <p className="text-sm text-muted mt-0.5">
-                {certs.length} certificación{certs.length !== 1 ? 'es' : ''} · cada envío pasa por revisión
+                {meta.totalItems} certificación{meta.totalItems !== 1 ? 'es' : ''} · cada envío pasa por revisión
               </p>
             </div>
           </div>
-          {certs.length > 0 && (
+          {meta.totalItems > 0 && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-dark hover:bg-primary-darkest text-white text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
               Agregar
@@ -319,25 +426,73 @@ export default function BusinessCertifications() {
         </div>
       </div>
 
-      {certs.length === 0 ? (
-        <EmptyCertifications onAdd={() => setShowForm(true)} />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {certs.map((cert) => (
-            <CertCard
-              key={cert.id_certification}
-              cert={cert}
-              onDelete={setDeletingCert}
-            />
-          ))}
+      {/* Stat cards */}
+      {meta.totalItems > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-yellow-50 rounded-xl px-4 py-3 border border-yellow-100">
+            <p className="text-xs text-yellow-700 font-medium">Pendientes</p>
+            <p className="text-2xl font-bold mt-0.5 text-yellow-800">{meta.totalPending}</p>
+          </div>
+          <div className="bg-green-50 rounded-xl px-4 py-3 border border-green-100">
+            <p className="text-xs text-green-700 font-medium">Aprobadas</p>
+            <p className="text-2xl font-bold mt-0.5 text-green-800">{meta.totalApproved}</p>
+          </div>
+          <div className="bg-card-bg rounded-xl px-4 py-3 border border-edge">
+            <p className="text-xs text-muted font-medium">Total</p>
+            <p className="text-2xl font-bold mt-0.5 text-heading">{meta.totalItems}</p>
+          </div>
         </div>
       )}
 
-      {showForm && (
+      {certs.length === 0 && meta.totalItems === 0 ? (
+        <EmptyCertifications onAdd={() => setShowForm(true)} />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {certs.map((cert) => (
+              <CertCard
+                key={cert.id_certification}
+                cert={cert}
+                onDelete={setDeletingCert}
+                onEdit={setEditingCert}
+              />
+            ))}
+          </div>
+
+          {/* Paginador */}
+          {meta.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page <= 1}
+                aria-label="Página anterior"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted hover:bg-edge/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm text-muted">
+                Página <span className="font-semibold text-heading">{page}</span> de{' '}
+                <span className="font-semibold text-heading">{meta.totalPages}</span>
+              </span>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page >= meta.totalPages}
+                aria-label="Página siguiente"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted hover:bg-edge/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {(showForm || editingCert) && (
         <CertFormModal
-          onClose={() => setShowForm(false)}
+          onClose={() => { setShowForm(false); setEditingCert(null); }}
           onSave={handleSave}
           loading={actionLoading}
+          editingCert={editingCert}
         />
       )}
 

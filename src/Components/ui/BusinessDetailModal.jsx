@@ -3,12 +3,14 @@ import {
   Building2,
   CalendarDays,
   Clock,
+  Download,
+  ExternalLink,
+  FileText,
   Globe,
   Loader2,
   Mail,
   MapPin,
   Phone,
-  Star,
   Tag,
   UserCheck,
   UserPlus,
@@ -17,6 +19,7 @@ import {
 import { useEffect } from 'react';
 import { FaFacebook, FaInstagram } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
+import { useNavigate } from 'react-router-dom';
 import { useToastContext } from '../../context/ToastContext';
 import useFollow from '../../hooks/useFollow';
 
@@ -32,7 +35,19 @@ const DAY_LABELS = {
 
 const tagName = (t) => t.name ?? t.tagName ?? t.tag ?? '';
 
-export default function BusinessDetailModal({ business, onClose }) {
+async function downloadFile(url, filename) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename || 'documento.pdf';
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
+export default function BusinessDetailModal({ business, onClose, footerSlot }) {
+  const navigate = useNavigate();
   const { success, error: toastError } = useToastContext();
   const { isFollowing, toggle, loading, initializing, isAuthenticated } =
     useFollow(business.id_business);
@@ -135,12 +150,21 @@ export default function BusinessDetailModal({ business, onClose }) {
             <p className="text-sm text-body leading-relaxed">{business.description}</p>
           )}
 
-          {(business.address || business.phone || business.emailBusiness || business.website) && (
+          {(business.municipio || business.address || business.phone || business.emailBusiness || business.website) && (
             <div className="space-y-2 pt-1 border-t border-edge/40">
               <p className="text-xs font-semibold text-muted uppercase tracking-wider pt-2">
                 Contacto
               </p>
               <div className="space-y-2">
+                {business.municipio?.nombre && (
+                  <div className="flex items-center gap-2 text-xs text-body font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-primary-mid shrink-0" />
+                    <span>
+                      {[business.municipio.departamento?.nombre, business.municipio.nombre]
+                        .filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                )}
                 {business.address && (
                   <div className="flex items-start gap-2 text-xs text-body">
                     <MapPin className="w-3.5 h-3.5 text-muted mt-0.5 shrink-0" />
@@ -250,6 +274,33 @@ export default function BusinessDetailModal({ business, onClose }) {
             </div>
           )}
 
+          {business.legal_document_url && (
+            <div className="space-y-2 pt-3 border-t border-edge/40">
+              <div className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-muted" />
+                <p className="text-xs font-semibold text-muted uppercase tracking-wider">Documento legal</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={business.legal_document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-edge text-xs font-medium text-body hover:border-primary-mid hover:text-primary-dark transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Ver documento
+                </a>
+                <button
+                  onClick={() => downloadFile(business.legal_document_url, `${business.businessName}-documento.pdf`)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-edge text-xs font-medium text-body hover:border-primary-mid hover:text-primary-dark transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Descargar
+                </button>
+              </div>
+            </div>
+          )}
+
           {business.createdAt && (
             <div className="flex items-center gap-1.5 pt-3 border-t border-edge/40">
               <CalendarDays className="w-3.5 h-3.5 text-muted" />
@@ -262,39 +313,53 @@ export default function BusinessDetailModal({ business, onClose }) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-3 border-t border-edge/40">
-            <Star className="w-3.5 h-3.5 text-muted" />
-            <p className="text-xs text-muted italic">
-              Valoraciones disponibles próximamente
-            </p>
-          </div>
         </div>
 
-        {/* Footer: botón Seguir */}
+        {/* Footer */}
         <div className="px-5 py-4 border-t border-edge/40 shrink-0">
-          <button
-            onClick={handleFollow}
-            disabled={initializing || loading}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-              isFollowing
-                ? 'bg-primary-softest text-primary-dark border border-edge hover:bg-primary-light'
-                : 'bg-primary-dark text-on-dark-active hover:bg-primary-darkest'
-            }`}
-          >
-            {initializing || loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : isFollowing ? (
-              <>
-                <UserCheck className="w-4 h-4" />
-                Siguiendo
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-4 h-4" />
-                Seguir negocio
-              </>
-            )}
-          </button>
+          {footerSlot ? (
+            <div className="space-y-2">
+              <div className="flex gap-2">{footerSlot}</div>
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/negocio/${business.id_business}`, { state: { business } });
+                }}
+                className="w-full py-2 rounded-xl border border-edge text-sm font-medium text-muted hover:text-body hover:border-primary-mid transition-colors"
+              >
+                Ver perfil completo
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/negocio/${business.id_business}`, { state: { business } });
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-edge text-sm font-medium text-body hover:border-primary-mid hover:text-primary-dark transition-colors"
+              >
+                Ver perfil completo
+              </button>
+              <button
+                onClick={handleFollow}
+                disabled={initializing || loading}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                  isFollowing
+                    ? 'bg-primary-softest text-primary-dark border border-edge hover:bg-primary-light'
+                    : 'bg-primary-dark text-on-dark-active hover:bg-primary-darkest'
+                }`}
+              >
+                {initializing || loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isFollowing ? (
+                  <><UserCheck className="w-4 h-4" />Siguiendo</>
+                ) : (
+                  <><UserPlus className="w-4 h-4" />Seguir negocio</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

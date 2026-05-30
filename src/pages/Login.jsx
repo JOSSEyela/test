@@ -12,10 +12,10 @@ const redirectByRole = (rol, navigate) => {
     case 'admin':
       return navigate('/adminDashboard');
     case 'owner':
-      return navigate('/dashboardBusiness');
+      return navigate('/dashboardBusiness/perfil');
     case 'user':
     default:
-      return navigate('/dashboard');
+      return navigate('/');
   }
 };
 

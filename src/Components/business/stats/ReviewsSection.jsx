@@ -1,19 +1,38 @@
-import { MessageSquare, Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare, Star } from 'lucide-react';
+import { useState } from 'react';
 import ReviewCard from './ReviewCard';
 import useBusinessReviews from '../../../hooks/useBusinessReviews';
+import { useToastContext } from '../../../context/ToastContext';
 
 const FILTER_OPTIONS = [
   { label: 'Todas', value: null },
-  { label: '5 ★', value: 5 },
-  { label: '4 ★', value: 4 },
-  { label: '3 ★', value: 3 },
-  { label: '2 ★', value: 2 },
-  { label: '1 ★', value: 1 },
+  { label: '5', value: 5 },
+  { label: '4', value: 4 },
+  { label: '3', value: 3 },
+  { label: '2', value: 2 },
+  { label: '1', value: 1 },
 ];
 
 export default function ReviewsSection({ businessId }) {
-  const { reviews, meta, filter, setFilter, loadMore, hasMore, loading, error } =
-    useBusinessReviews(businessId);
+  const [filter, setFilter] = useState(null);
+  const { success, error: showError } = useToastContext();
+
+  const { reviews, meta, report, reported, loadMore, hasMore, loading, error } =
+    useBusinessReviews(businessId, { ratingFilter: filter, skipMyReview: true });
+
+  async function handleReport(reviewId, reason) {
+    try {
+      await report(reviewId, reason);
+      success('Reseña reportada. El equipo la revisará pronto.');
+    } catch (err) {
+      const msg = err?.response?.data?.message ?? err?.message ?? '';
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('conflict') || err?.response?.status === 409) {
+        showError('Ya reportaste esta reseña anteriormente.');
+      } else {
+        showError(msg || 'No se pudo enviar el reporte. Intenta de nuevo.');
+      }
+    }
+  }
 
   return (
     <section className="bg-card-bg rounded-2xl border border-edge p-6">
@@ -34,13 +53,14 @@ export default function ReviewsSection({ businessId }) {
           <button
             key={String(opt.value)}
             onClick={() => setFilter(opt.value)}
-            className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
               filter === opt.value
                 ? 'bg-primary-dark text-on-dark-active'
                 : 'bg-primary-softest text-primary-dark hover:bg-primary-light'
             }`}
           >
             {opt.label}
+            {opt.value !== null && <Star className="w-3 h-3 fill-current" />}
           </button>
         ))}
       </div>
@@ -59,7 +79,12 @@ export default function ReviewsSection({ businessId }) {
       {reviews.length > 0 && (
         <div className="space-y-3">
           {reviews.map(review => (
-            <ReviewCard key={review.id_review} review={review} />
+            <ReviewCard
+              key={review.id_review}
+              review={review}
+              onReport={handleReport}
+              isReported={reported.has(review.id_review)}
+            />
           ))}
         </div>
       )}
