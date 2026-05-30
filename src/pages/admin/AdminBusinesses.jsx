@@ -507,7 +507,7 @@ function BusinessReviewCard({ business, onApprove, onReject, onDetail, actionLoa
         {/* Acciones */}
         <div className="flex flex-wrap gap-2">
           <Button
-            className="!w-auto !py-1.5 !px-3 !text-xs !rounded-lg !bg-none !from-transparent !to-transparent bg-card-bg !text-body border border-edge hover:bg-app-bg"
+            className="!w-auto !py-1.5 !px-3 !text-xs !rounded-lg !bg-none !from-transparent !to-transparent bg-card-bg !text-on-dark-active border border-edge hover:bg-app-bg"
             onClick={() => onDetail(business)}
           >
             <Eye className="w-3 h-3" /> Ver detalles
