@@ -27,7 +27,7 @@ export function NotificationsProvider({ children }) {
       isUser:  role === 'user',
       userId:  decoded?.sub ?? null,
     };
-  }, [authTick]);
+  }, [authTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shouldConnect = isOwner || isAdmin || isUser;
 

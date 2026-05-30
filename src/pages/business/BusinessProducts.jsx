@@ -476,7 +476,7 @@ export default function BusinessProducts() {
       }
     }
     init();
-  }, [isRejected, isPending]);
+  }, [isRejected, isPending, showError]);
 
   if (isRejected || isPending) return <BlockedPageGuard status={status} rejectionReason={rejectionReason} />;
 

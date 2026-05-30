@@ -19,7 +19,7 @@ export default function usePublicBusinesses(filters = {}) {
     } finally {
       setLoading(false);
     }
-  }, [filtersKey]);
+  }, [filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetch(); }, [fetch]);
 

@@ -991,7 +991,7 @@ function TagsForm({ selectedIds, onChange, allTags }) {
   );
 }
 
-function TabInfo({ business, save, basicSave, canManage, allTags, certsCount, onGoToProducts }) {
+function TabInfo({ business, save, basicSave, canManage, allTags, onGoToProducts }) {
   const { products } = usePublicProducts(business.id_business);
 
   return (
@@ -1746,7 +1746,7 @@ export default function BusinessProfile() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-10">
         <div className="space-y-10">
-          {activeTab === 'info'  && <TabInfo business={displayBusiness} save={save} basicSave={basicSave} canManage={canManage} allTags={allTags} certsCount={certsCount} onGoToProducts={() => setActiveTab('prods')} />}
+          {activeTab === 'info'  && <TabInfo business={displayBusiness} save={save} basicSave={basicSave} canManage={canManage} allTags={allTags} onGoToProducts={() => setActiveTab('prods')} />}
           {activeTab === 'prods' && <TabProducts businessId={id} canManage={canManage} />}
           {activeTab === 'certs' && <TabCertifications certifications={certifications} />}
         </div>
