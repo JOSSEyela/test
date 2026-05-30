@@ -113,7 +113,8 @@ export default function LandingPage() {
           b.businessName?.toLowerCase().includes(q) ||
           b.description?.toLowerCase().includes(q) ||
           b.category?.category?.toLowerCase().includes(q) ||
-          b.address?.toLowerCase().includes(q),
+          b.address?.toLowerCase().includes(q) ||
+          b.tags?.some((t) => (t.tag ?? t.tagName ?? '').toLowerCase().includes(q)),
       );
     }
 

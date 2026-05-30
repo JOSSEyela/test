@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { getSavedGeneralSummary } from '../../services/summary/summary.service';
 
 export default function AiReviewSummary({ businessId }) {
@@ -36,7 +36,7 @@ export default function AiReviewSummary({ businessId }) {
           <Sparkles className="w-3.5 h-3.5 text-primary-dark" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-heading">Opinión consolidada IA</p>
+          <p className="text-sm font-semibold text-heading">Lo que piensa la comunidad</p>
           <p className="text-xs text-muted">
             Basada en {data.totalReviews ?? 0} reseñas
             {data.averageRating ? ` — ${Number(data.averageRating).toFixed(1)} ★ promedio` : ''}

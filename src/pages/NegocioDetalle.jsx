@@ -446,7 +446,6 @@ function PublicProductDetailModal({ product, onClose }) {
 function TabInfo({ business, businessId, ownerUserId, onViewProduct, onGoToProducts }) {
   const reviewsCount = business.total_reviews ?? 0;
   const { products }  = usePublicProducts(businessId);
-  const certsCount    = business.certifications?.filter(c => c.status === 'Active').length ?? 0;
 
   return (
     <div className="space-y-10">
@@ -466,8 +465,8 @@ function TabInfo({ business, businessId, ownerUserId, onViewProduct, onGoToProdu
 
           <div className="flex gap-3 px-6 pb-6">
             {[
-              { value: products.length,  label: 'Productos'       },
-              { value: certsCount,       label: 'Certificaciones' },
+              { value: products.length,                 label: 'Productos'  },
+              { value: business.followers_count ?? 0,   label: 'Seguidores' },
               {
                 value: business.average_rating != null
                   ? Number(business.average_rating).toFixed(1)

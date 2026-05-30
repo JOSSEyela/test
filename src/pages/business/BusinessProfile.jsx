@@ -1051,8 +1051,8 @@ function TabInfo({ business, save, basicSave, canManage, allTags, certsCount, on
 
               <div className="flex gap-3 px-6 pb-6">
                 {[
-                  { value: products.length, label: 'Productos'       },
-                  { value: certsCount,      label: 'Certificaciones' },
+                  { value: products.length,                  label: 'Productos'  },
+                  { value: business.followers_count ?? 0,    label: 'Seguidores' },
                   {
                     value: business.average_rating != null
                       ? Number(business.average_rating).toFixed(1)
