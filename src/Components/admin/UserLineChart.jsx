@@ -1,4 +1,4 @@
-// Chart dimensions (SVG viewBox units)
+
 const W = 640;
 const H = 180;
 const PAD_X = 4;
@@ -6,9 +6,8 @@ const PAD_TOP = 8;
 const PAD_BOT = 8;
 
 /**
- * Single-series SVG line chart with HTML labels (no distortion).
- * @param {number[]} series - Cumulative count values
- * @param {string}   color  - Hex color for line + gradient
+ * @param {number[]} series
+ * @param {string}   color
  */
 export default function UserLineChart({ series, color = '#1F3D2B' }) {
   if (!series || series.length < 2) return null;
@@ -18,7 +17,6 @@ export default function UserLineChart({ series, color = '#1F3D2B' }) {
   const lastVal = series[series.length - 1];
   const firstVal = series[0];
   const rawMax = Math.max(...series, 1);
-  // Add 10% headroom so the line isn't glued to the top
   const max = rawMax * 1.12;
 
   const xAt = i => PAD_X + (i / (series.length - 1)) * (W - PAD_X * 2);
@@ -30,19 +28,15 @@ export default function UserLineChart({ series, color = '#1F3D2B' }) {
     pathD +
     ` L ${xAt(series.length - 1).toFixed(1)},${H} L ${xAt(0).toFixed(1)},${H} Z`;
 
-  // 5 Y-axis ticks evenly spaced from 0 → rawMax
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(p => Math.round(rawMax * p));
 
-  // Position of the last point as % of the rendered SVG element height
   const endYPct = (yAt(lastVal) / H) * 100;
 
-  // Delta vs first value
   const delta = lastVal - firstVal;
   const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
 
   return (
     <div className="flex gap-2">
-      {/* ── Y-axis labels (HTML, no distortion) ─────────────────── */}
       <div className="flex flex-col justify-between text-right w-10 shrink-0 py-1" style={{ height: 180 }}>
         {[...ticks].reverse().map((t, i) => (
           <span key={i} className="text-[11px] font-medium leading-none" style={{ color: 'var(--color-muted)' }}>

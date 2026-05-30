@@ -1,9 +1,9 @@
 import { AlertTriangle, Building2, CalendarDays, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, Globe, LayoutDashboard, LayoutGrid, LayoutList, Loader2, Mail, MapPin, Phone, Search, Tag as TagIcon, Trash2, X, XCircle } from 'lucide-react';
-import ModalOverlay from '../../Components/ui/ModalOverlay';
 import { useCallback, useEffect, useState } from 'react';
 import { MunicipioForm } from '../../Components/business/profile/BusinessLocationCard';
 import Button from '../../Components/button';
 import BusinessDetailModal from '../../Components/ui/BusinessDetailModal';
+import ModalOverlay from '../../Components/ui/ModalOverlay';
 import API from '../../api/api';
 import { useToastContext } from '../../context/ToastContext';
 import { changeBusinessStatus, deleteBusiness, getBusinessesForAdmin, updateBusiness } from '../../services/business/business.admin.service';
@@ -510,7 +510,7 @@ function BusinessReviewCard({ business, onApprove, onReject, onDetail, actionLoa
             className="!w-auto !py-1.5 !px-3 !text-xs !rounded-lg !bg-none !from-transparent !to-transparent bg-card-bg !text-body border border-edge hover:bg-app-bg"
             onClick={() => onDetail(business)}
           >
-            <Eye className="w-3 h-3" /> Ver detalle
+            <Eye className="w-3 h-3" /> Ver detalles
           </Button>
 
           {status === 'Pending' && (
@@ -804,7 +804,7 @@ export default function AdminBusinesses() {
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1">
                             <button
-                              title="Ver detalle"
+                              title="Ver detalles"
                               onClick={() => setDetailBusiness(business)}
                               className="p-1.5 rounded-lg text-muted hover:text-primary-dark hover:bg-primary-softest/50 transition-colors"
                             >
