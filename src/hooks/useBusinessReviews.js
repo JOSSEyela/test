@@ -1,44 +1,122 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getBusinessReviews } from '../services/stats/stats.service';
+import { useCallback, useEffect, useState } from 'react';
+import { getToken } from '../utils/storage';
+import { decodeToken } from '../utils/jwt.utils';
+import {
+  getBusinessReviewsPublic,
+  getMyReviewForBusiness,
+  createReview,
+  updateReview,
+} from '../services/user/publicReviews.service';
+import { reportReview } from '../services/reviews/reviews-report.service';
 
-export default function useBusinessReviews(businessId) {
-  const [reviews, setReviews] = useState([]);
-  const [meta, setMeta] = useState(null);
-  const [filter, setFilter] = useState(null);
-  const [nextPage, setNextPage] = useState(2);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function storageKey(userId) {
+  return `reportedReviews_${userId ?? 'anon'}`;
+}
+function loadReported(userId) {
+  try {
+    const raw = localStorage.getItem(storageKey(userId));
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+function saveReported(userId, set) {
+  try {
+    localStorage.setItem(storageKey(userId), JSON.stringify([...set]));
+  } catch { /* no-op */ }
+}
 
-  const fetchPage = useCallback(async (page, ratingFilter, append) => {
+export default function useBusinessReviews(businessId, { ratingFilter = null, skipMyReview = false } = {}) {
+  const [reviews,      setReviews]      = useState([]);
+  const [meta,         setMeta]         = useState(null);
+  const [ratingCounts, setRatingCounts] = useState({});
+  const [myReview,     setMyReview]     = useState(undefined);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(null);
+  const [page,         setPage]         = useState(1);
+
+  const token     = getToken();
+  const decoded   = decodeToken(token);
+  const currentUserId = decoded?.sub != null ? Number(decoded.sub) : null;
+  const isAuthenticated = Boolean(token);
+
+  const [reported, setReported] = useState(() => loadReported(currentUserId));
+
+  const fetchReviews = useCallback(async (p = 1) => {
     if (!businessId) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await getBusinessReviews(businessId, {
-        page,
+      const res = await getBusinessReviewsPublic(businessId, {
+        page: p,
         limit: 10,
-        rating: ratingFilter ?? undefined,
+        ...(ratingFilter ? { rating: ratingFilter } : {}),
       });
-      setMeta(result.meta);
-      setReviews(prev => append ? [...prev, ...result.data] : result.data);
-    } catch {
-      setError('No se pudieron cargar las reseñas');
+      setReviews(p === 1 ? (res.data ?? []) : (prev) => [...prev, ...(res.data ?? [])]);
+      setMeta(res.meta ?? null);
+      setPage(p);
+    } catch (err) {
+      setError(err?.message ?? 'Error al cargar reseñas.');
     } finally {
       setLoading(false);
     }
+  }, [businessId, ratingFilter]);
+
+  const fetchMyReview = useCallback(async () => {
+    if (skipMyReview || !isAuthenticated || !businessId) { setMyReview(null); return; }
+    try {
+      setMyReview(await getMyReviewForBusiness(businessId));
+    } catch {
+      setMyReview(null);
+    }
+  }, [businessId, isAuthenticated, skipMyReview]);
+
+  const fetchRatingCounts = useCallback(async () => {
+    if (!businessId) return;
+    try {
+      const results = await Promise.all(
+        [1, 2, 3, 4, 5].map((s) =>
+          getBusinessReviewsPublic(businessId, { page: 1, limit: 1, rating: s })
+        )
+      );
+      const counts = {};
+      [1, 2, 3, 4, 5].forEach((s, i) => {
+        counts[s] = results[i]?.meta?.totalItems ?? 0;
+      });
+      setRatingCounts(counts);
+    } catch { /* no-op */ }
   }, [businessId]);
 
-  useEffect(() => {
-    setNextPage(2);
-    fetchPage(1, filter, false);
-  }, [filter, fetchPage]);
+  useEffect(() => { fetchReviews(1); }, [fetchReviews]);
+  useEffect(() => { fetchMyReview(); }, [fetchMyReview]);
+  useEffect(() => { fetchRatingCounts(); }, [fetchRatingCounts]);
 
-  const loadMore = useCallback(() => {
-    fetchPage(nextPage, filter, true);
-    setNextPage(p => p + 1);
-  }, [fetchPage, nextPage, filter]);
+  const submitReview = useCallback(async (payload) => {
+    const res = myReview
+      ? await updateReview(myReview.id_review, payload)
+      : await createReview(businessId, payload);
+    await Promise.all([fetchReviews(1), fetchMyReview()]);
+    return res;
+  }, [businessId, myReview, fetchReviews, fetchMyReview]);
 
-  const hasMore = meta ? nextPage <= meta.totalPages : false;
+  const report = useCallback(async (reviewId, reason) => {
+    const res = await reportReview(reviewId, reason);
+    setReported((prev) => {
+      const next = new Set([...prev, reviewId]);
+      saveReported(currentUserId, next);
+      return next;
+    });
+    return res;
+  }, [currentUserId]);
 
-  return { reviews, meta, filter, setFilter, loadMore, hasMore, loading, error };
+  const loadMore = useCallback(() => fetchReviews(page + 1), [fetchReviews, page]);
+
+  const hasMore = meta ? meta.currentPage < meta.totalPages : false;
+
+  return {
+    reviews, meta, ratingCounts, myReview, loading, error,
+    isAuthenticated, currentUserId,
+    submitReview, report, reported, loadMore, hasMore,
+    retry: () => fetchReviews(1),
+  };
 }
