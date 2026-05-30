@@ -90,12 +90,12 @@ export default function AdminCertifications() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, toast]);
 
   useEffect(() => {
     setPage(1);
     fetchAll(1, statusFilter);
-  }, [statusFilter]);
+  }, [fetchAll, statusFilter]);
 
   const handlePageChange = (p) => {
     setPage(p);

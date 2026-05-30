@@ -596,7 +596,7 @@ export default function AdminBusinesses() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchBusinesses(activeTab, page);

@@ -80,7 +80,7 @@ export default function AdminCategorias() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { fetchAll(1); }, [fetchAll]);
 

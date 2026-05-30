@@ -44,7 +44,7 @@ export default function GoogleCallback() {
     } catch {
       navigate('/login?error=google_failed', { replace: true });
     }
-  }, []);
+  }, [navigate, params]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-app-bg">

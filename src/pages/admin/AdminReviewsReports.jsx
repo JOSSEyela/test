@@ -229,7 +229,7 @@ export default function AdminReviewsReports() {
   useEffect(() => {
     setPage(1);
     fetchAll(1, reasonFilter);
-  }, [reasonFilter]);
+  }, [fetchAll, reasonFilter]);
 
   const handlePageChange = (p) => {
     setPage(p);

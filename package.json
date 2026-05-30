@@ -24,6 +24,7 @@
     "socket.io-client": "^4.8.3",
     "swiper": "^12.1.4"
   },
+  
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",

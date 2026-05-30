@@ -170,7 +170,7 @@ export default function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [roleFilter, sort]);
+  }, [roleFilter, sort, toast]);
 
   useEffect(() => {
     fetchUsers(1, roleFilter, sort);
@@ -178,7 +178,7 @@ export default function AdminUsers() {
       API.get('/rol').then((r) => setRoles(Array.isArray(r.data) ? r.data : [])),
       API.get('/genero?limit=100').then((r) => setGeneros(Array.isArray(r.data?.data) ? r.data.data : [])),
     ]).catch(() => {});
-  }, [roleFilter, sort]);
+  }, [fetchUsers, roleFilter, sort]);
 
   const handlePageChange = (p) => {
     setPage(p);
