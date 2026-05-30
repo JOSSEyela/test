@@ -804,10 +804,11 @@ export default function NegocioDetalle() {
   if (!business) return null;
 
   const businessId = Number(id);
-  const certsCount = business.certifications?.filter(c => c.status === 'Active').length ?? 0;
-
   const tabCount = (tab) => {
-    if (tab.id === 'certs' && certsCount > 0) return certsCount;
+    if (tab.id === 'certs') {
+      const count = business.certifications?.filter(c => c.status === 'Active').length ?? 0;
+      return count > 0 ? count : null;
+    }
     return null;
   };
 
